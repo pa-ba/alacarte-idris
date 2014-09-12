@@ -44,21 +44,45 @@ findLtPrf f `(~a :+: ~b) = case (findLtPrf f a, findLtPrf f b) of
 findLtPrf f1 f2 = if f1 == f2 then Just `(here {f=~f1}) else Nothing
 findLtPrf _ _ = Nothing
 
+isGoal : TT -> TT -> TT -> Bool
+isGoal f g `(~f' :<: ~g') = f' == f && g' == g
+isGoal _ _ _ = False
+
+findInCtxt : TT -> TT -> List (TTName, Binder TT) -> Maybe TT
+findInCtxt f g (x :: r) = case x of
+           (n, PVar t) => if isGoal f g t then Just (P Bound n t)
+                          else findInCtxt f g r
+           _ => findInCtxt f g r
+findInCtxt f g [] = Nothing
+
+
 seeSig : List (TTName, Binder TT) -> TT -> Tactic
-seeSig ctxt `(~x :<: ~y) with (findLtPrf x y)
-  | Just prf  = Exact prf
-  | Nothing   = Fail [TextPart "not found prf"]
+seeSig ctxt `(~x :<: ~y) = case findInCtxt x y ctxt of
+       Just prf => Exact prf
+       Nothing => case findLtPrf x y of
+               Just prf  => Exact prf
+               Nothing   => Fail [TextPart "not found prf"]
 seeSig ctxt g = Fail [TextPart "not the right goal", TermPart g]
 
 inj : {default tactics {applyTactic seeSig ; solve }  S : f :<: g} -> f a -> g a
-inj {S = MkSub inject} {a = a} = inject a
+inj {S = MkSub inj'} {a = a} = inj' a
 
 
-data F a = MkF a
+data F a = MkF a a
 
 data H a = MkH a
 
 data G a = MkG a
+
+data Fix : (Type -> Type) -> Type where
+  In : f (Fix f) -> Fix f
+  
+inject : {default tactics {applyTactic seeSig ; solve }  S : f :<: g} -> f (Fix g) -> Fix g
+inject {f=f} {g=g} = In . inj {f=f} {g = g}
+
+-- smart constructor for F
+iF : {default tactics {applyTactic seeSig ; solve }  S : F :<: g} -> Fix g -> Fix g -> Fix g
+iF {S=S} x y = inject {S = S} (MkF x y)
 
 test : F a -> (F :+: H) a
 test x = inj {f=F} {g = F:+:H } x
