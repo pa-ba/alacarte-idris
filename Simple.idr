@@ -40,12 +40,25 @@ seeSig ctxt `(~x :<: ~y) with (findLtPrf x y)
   | Nothing   = Fail [TextPart "not found prf"]
 seeSig ctxt g = Fail [TextPart "not the right goal", TermPart g]
 
-inj : {default tactics {applyTactic seeSig ; solve }  S : f :<: g} -> f a -> g a
-inj {S = Here} f = f
-inj {S = Left l} f = Inl (inj {S = l} f)
-inj {S = Right r} f = Inr (inj {S = r} f)
-inj {S = Split l r} (Inl x) = inj {S=l} x
-inj {S = Split l r} (Inr x) = inj {S=r} x
+
+data Proxy : f :<: g -> Type where
+     Pr : (prf : f :<: g) -> Proxy prf
+
+class Sub (f : Type -> Type) (g : Type -> Type) (S : f :<: g) where
+      inj : Proxy S -> f a -> g a
+      
+
+instance Sub f f Here where
+  inj (Pr _) = id
+
+instance Sub f f' prf => Sub f (f' :+: g) (Left prf) where
+  inj (Pr (Left prf)) = Inl . inj (Pr prf)
+
+
+inj' : {default tactics {applyTactic seeSig; solve} prf : f :<: g} -> {default %instance dict : Sub f g prf} 
+     -> f a -> g a
+inj' {prf} x = inj (Pr prf) x
+
 
 
 data F a = MkF a
@@ -55,7 +68,7 @@ data H a = MkH a
 data G a = MkG a
 
 test : F a -> (F :+: H) a
-test x = inj {f=F} {g = F:+:H } x
+test x = inj' x
 
 tacticTest1 : F :<: F
 tacticTest1 = proof applyTactic seeSig
