@@ -15,33 +15,30 @@ instance Functor F where
 instance Functor H where  
     map f (MkH x) = MkH (f x)
 
+instance Functor G where  
+    map f (MkG x) = MkG (f x)
+
 
 
 -- smart constructor for F
 iF : F < g, Fix g -> Fix g -> Fix g
 iF x y = inject {f=F} (MkF x y)
 
+
+
 test : F a -> (F :+: H) a
 test = inj
 
-tacticTest1 : F :<: F
-tacticTest1 = proof applyTactic seeSig
+tacticTest1 : F a -> (F :+: H) a
+tacticTest1 = inj
 
--- tacticTest1' : F :<: F
--- tacticTest1' = proof search
 
-tacticTest2 : F :<: (F :+: H)
-tacticTest2 = proof applyTactic seeSig
+tacticTest2 : F a -> (F :+: H) a
+tacticTest2 = inj
 
--- tacticTest2' : F :<: (F :+: H)
--- tacticTest2' = proof search
 
-tacticTest3 : (F :+: H) :<: (H :+: F)
-tacticTest3 = proof applyTactic seeSig
+tacticTest3 : (F :+: H) a -> (H :+: F) a
+tacticTest3 = inj
 
--- For this, Idris's proof search breaks down
--- tacticTest3' : (F :+: H) :<: (H :+: F)
--- tacticTest3' = proof search
-
-tacticTest4 : (F :+: H) :<: (H :+: G :+: F)
-tacticTest4 = proof applyTactic seeSig
+tacticTest4 : (F :+: H) a -> (H :+: G :+: F) a
+tacticTest4 = inj
