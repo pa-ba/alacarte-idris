@@ -9,6 +9,8 @@ infixl 9 :+:
 infixl 8 :<:
 infixl 8 :=:
 
+%language ErrorReflection
+
 %default total
 
 data (:+:) : (Type -> Type) -> (Type -> Type) -> Type -> Type  where
@@ -48,19 +50,19 @@ split (MkSub inj1 prj1) (MkSub inj2 prj2) = MkSub inj prj
             inj a (Inr x) = inj2 a x
             prj a x = map Inl (prj1 a x) <|> map Inr (prj2 a x)
 
-findSub : TT -> TT -> Maybe TT
-findSub f g = if f == g then Just `(here {f=~f}) 
+findSub : TT -> TT -> Either TT TT
+findSub f g = if f == g then Right `(here {f=~f}) 
                 else case g of
                 `(~a :+: ~b) => case (findSub f a, findSub f b) of
-                             (Just l, _) => Just `(left {f=~f} {g1=~a} {g2=~b} ~l)
-                             (_, Just r) => Just `(right {f=~f} {g1=~a} {g2=~b} ~r)
+                             (Right l, _) => Right `(left {f=~f} {g1=~a} {g2=~b} ~l)
+                             (_, Right r) => Right `(right {f=~f} {g1=~a} {g2=~b} ~r)
                              _           => next f
                 _  => next f
-  where next : TT -> Maybe TT
+  where next : TT -> Either TT TT
         next `(~f1 :+: ~f2) = do l <- findSub f1 g
                                  r <- findSub f2 g
                                  return `(split {f1=~f1} {g=~g} {f2=~f2} ~l ~r)
-        next _ = Nothing
+        next f = Left f
 
 sigList : TT -> List TT
 sigList `(~f :+: ~g) = sigList f ++ sigList g
@@ -95,13 +97,24 @@ tacticSub ctxt `(~x :<: ~y) =
                    _ => case findInCtxt x y ctxt of
                            Just prf => Exact prf
                            Nothing => case findSub x y of
-                                        Just prf  => Exact prf
-                                        Nothing   => Fail [TextPart "Cannot derive", TermPart `(~x :<: ~y)]
+                                        Right prf  => Exact prf
+                                        Left f => Fail [TermPart f, TextPart "does not occur in", TermPart y]
 tacticSub ctxt g = Fail [TermPart g, TextPart "is not a goal of the form f :<: g"]
 
 
 syntax [f] "<" [g] "," [t] = (Functor f, Functor g) => 
        {default tactics {applyTactic tacticSub ; solve }  S : f :<: g} -> t
+
+
+
+%error_handler
+subErr : ErrorHandler
+subErr (CantSolveGoal g ctxt) = case g of
+       `(~x :<: ~y) => case tacticSub [] g of
+                            Fail err => Just [TextPart "Cannot derive", TermPart g, SubReport err]
+                            _ => Nothing
+       _ => Nothing
+subErr _ = Nothing
 
 inj : f < g, f a ->  g a
 inj x {S = S} {a = a} = injMethod S a x

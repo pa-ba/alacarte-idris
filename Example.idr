@@ -44,5 +44,5 @@ tacticTest4 : (F :+: H) a -> (H :+: G :+: F) a
 tacticTest4 = inj
 
 
-testAmb : (F) a -> (F :+: F) a
+testAmb : (H) a -> (F :+: G) a
 testAmb = inj
