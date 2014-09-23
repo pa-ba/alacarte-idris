@@ -50,17 +50,27 @@ split (MkSub inj1 prj1) (MkSub inj2 prj2) = MkSub inj prj
             inj a (Inr x) = inj2 a x
             prj a x = map Inl (prj1 a x) <|> map Inr (prj2 a x)
 
-findSub : TT -> TT -> Either TT TT
-findSub f g = if f == g then Right `(here {f=~f}) 
-                else case g of
-                `(~a :+: ~b) => case (findSub f a, findSub f b) of
+
+findInCtxt : TT -> TT -> List (TTName, TT, TT) -> Maybe TT
+findInCtxt f g ((n,f',g') :: r) = if f == f' && g == g' 
+                                  then Just (P Bound n `(~f :<: ~g))
+                                  else findInCtxt f g r
+findInCtxt f g [] = Nothing
+
+
+findSub : TT -> TT -> List (TTName, TT, TT) -> Either TT TT
+findSub f g ctxt = if f == g then Right `(here {f=~f}) 
+                   else case findInCtxt f g ctxt of
+                     Just t => Right t
+                     Nothing => case g of
+                        `(~a :+: ~b) => case (findSub f a ctxt, findSub f b ctxt) of
                              (Right l, _) => Right `(left {f=~f} {g1=~a} {g2=~b} ~l)
                              (_, Right r) => Right `(right {f=~f} {g1=~a} {g2=~b} ~r)
                              _           => next f
-                _  => next f
+                        _  => next f
   where next : TT -> Either TT TT
-        next `(~f1 :+: ~f2) = do l <- findSub f1 g
-                                 r <- findSub f2 g
+        next `(~f1 :+: ~f2) = do l <- findSub f1 g ctxt
+                                 r <- findSub f2 g ctxt
                                  return `(split {f1=~f1} {g=~g} {f2=~f2} ~l ~r)
         next f = Left f
 
@@ -76,17 +86,21 @@ hasDupl'  (x::xs) = if elem x xs then Just x else hasDupl' xs
 hasDupl : TT -> Maybe TT
 hasDupl = hasDupl' . sigList
 
-isGoal : TT -> TT -> TT -> Bool
-isGoal f g `(~f' :<: ~g') = f' == f && g' == g
-isGoal _ _ _ = False
+fromBinder : Binder TT -> TT
+fromBinder (Lam x) = x
+fromBinder (Pi x y) = y
+fromBinder (Let x y) = y
+fromBinder (NLet x y) = y
+fromBinder (Hole x) = x
+fromBinder (GHole x) = x
+fromBinder (Guess x y) = y
+fromBinder (PVar x) = x
+fromBinder (PVTy x) = x
 
-findInCtxt : TT -> TT -> List (TTName, Binder TT) -> Maybe TT
-findInCtxt f g (x :: r) = case x of
-           (n, PVar t) => if isGoal f g t then Just (P Bound n t)
-                          else findInCtxt f g r
-           _ => findInCtxt f g r
-findInCtxt f g [] = Nothing
-
+getGoals : (TTName, Binder TT) -> Maybe (TTName, TT, TT)
+getGoals (n, t) = case fromBinder t of
+                    `(~f :<: ~g) => Just (n, f, g)
+                    _              => Nothing
 
 tacticSub : List (TTName, Binder TT) -> TT -> Tactic
 tacticSub ctxt `(~x :<: ~y) = 
@@ -94,18 +108,14 @@ tacticSub ctxt `(~x :<: ~y) =
             Just x' => Fail [TermPart x', TextPart "occurs twice in", TermPart x]
             _ => case hasDupl y of
                    Just y' => Fail [TermPart y', TextPart "occurs twice in", TermPart y]
-                   _ => case findInCtxt x y ctxt of
-                           Just prf => Exact prf
-                           Nothing => case findSub x y of
-                                        Right prf  => Exact prf
-                                        Left f => Fail [TermPart f, TextPart "does not occur in", TermPart y]
+                   _ => case findSub x y (mapMaybe getGoals ctxt) of
+                          Right prf  => Exact prf
+                          Left f => Fail [TermPart f, TextPart "does not occur in", TermPart y]
 tacticSub ctxt g = Fail [TermPart g, TextPart "is not a goal of the form f :<: g"]
 
 
 syntax [f] "<" [g] "," [t] = (Functor f, Functor g) => 
        {default tactics {applyTactic tacticSub ; solve }  S : f :<: g} -> t
-
-
 
 %error_handler
 subErr : ErrorHandler
