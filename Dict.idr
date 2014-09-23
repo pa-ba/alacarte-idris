@@ -48,16 +48,19 @@ split (MkSub inj1 prj1) (MkSub inj2 prj2) = MkSub inj prj
             inj a (Inr x) = inj2 a x
             prj a x = map Inl (prj1 a x) <|> map Inr (prj2 a x)
 
-findLtPrf : TT -> TT -> Maybe TT
-findLtPrf `(~f1 :+: ~f2) g = do l <- findLtPrf f1 g
-                                r <- findLtPrf f2 g
-                                return `(split {f1=~f1} {g=~g} {f2=~f2} ~l ~r)
-findLtPrf f `(~a :+: ~b) = case (findLtPrf f a, findLtPrf f b) of
+findSub : TT -> TT -> Maybe TT
+findSub f g = if f == g then Just `(here {f=~f}) 
+                else case g of
+                `(~a :+: ~b) => case (findSub f a, findSub f b) of
                              (Just l, _) => Just `(left {f=~f} {g1=~a} {g2=~b} ~l)
                              (_, Just r) => Just `(right {f=~f} {g1=~a} {g2=~b} ~r)
-                             _           => Nothing
-findLtPrf f1 f2 = if f1 == f2 then Just `(here {f=~f1}) else Nothing
-findLtPrf _ _ = Nothing
+                             _           => next f
+                _  => next f
+  where next : TT -> Maybe TT
+        next `(~f1 :+: ~f2) = do l <- findSub f1 g
+                                 r <- findSub f2 g
+                                 return `(split {f1=~f1} {g=~g} {f2=~f2} ~l ~r)
+        next _ = Nothing
 
 isGoal : TT -> TT -> TT -> Bool
 isGoal f g `(~f' :<: ~g') = f' == f && g' == g
@@ -71,18 +74,18 @@ findInCtxt f g (x :: r) = case x of
 findInCtxt f g [] = Nothing
 
 
-seeSig : List (TTName, Binder TT) -> TT -> Tactic
-seeSig ctxt `(~x :<: ~y) = case findInCtxt x y ctxt of
+tacticSub : List (TTName, Binder TT) -> TT -> Tactic
+tacticSub ctxt `(~x :<: ~y) = case findInCtxt x y ctxt of
        Just prf => Exact prf
-       Nothing => case findLtPrf x y of
+       Nothing => case findSub x y of
                Just prf  => Exact prf
                Nothing   => Fail [TextPart "not found prf"]
-seeSig ctxt g = Fail [TextPart "not the right goal", TermPart g]
+tacticSub ctxt g = Fail [TextPart "not the right goal", TermPart g]
 
 
 
 syntax [f] "<" [g] "," [t] = (Functor f, Functor g) => 
-       {default tactics {applyTactic seeSig ; solve }  S : f :<: g} -> t
+       {default tactics {applyTactic tacticSub ; solve }  S : f :<: g} -> t
 
 inj : f < g, f a ->  g a
 inj x {S = S} {a = a} = injMethod S a x
