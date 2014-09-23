@@ -21,21 +21,32 @@ instance (Functor f, Functor g) => Functor (f :+: g) where
   map f (Inr x) = Inr (map f x)
 
 record (:<:) : (Type -> Type) -> (Type -> Type) -> Type where
-  MkSub : (injMethod : (a: Type) -> f a -> g a) -> f :<: g
+  MkSub : (injMethod : (a: Type) -> f a -> g a) ->
+          (prjMethod : (a: Type) -> g a -> Maybe (f a)) ->
+          f :<: g
 
 here : f :<: f
-here = MkSub (\ _ => id)
+here = MkSub (\ _ => id) (\ _ => Just)
 
 left : (f :<: g1) -> f :<: (g1 :+: g2)
-left (MkSub inj) = MkSub (\ a => Inl . inj a)
+left (MkSub inj prj) = MkSub 
+     (\ a => Inl . inj a) 
+     (\ a, x => case x of
+                 Inl x' => prj a x'
+                 Inr x' => Nothing)
 
 right : (f :<: g2) -> f :<: (g1 :+: g2)
-right (MkSub inj) = MkSub (\ a => Inr . inj a)
+right (MkSub inj prj) = MkSub 
+      (\ a => Inr . inj a)
+      (\ a, x => case x of
+                 Inl x => Nothing
+                 Inr x => prj a x)
 
 split : (f1 :<: g) -> (f2 :<: g) -> (f1 :+: f2) :<: g
-split (MkSub inj1) (MkSub inj2) = MkSub inj
+split (MkSub inj1 prj1) (MkSub inj2 prj2) = MkSub inj prj
       where inj a (Inl x) = inj1 a x
             inj a (Inr x) = inj2 a x
+            prj a x = map Inl (prj1 a x) <|> map Inr (prj2 a x)
 
 findLtPrf : TT -> TT -> Maybe TT
 findLtPrf `(~f1 :+: ~f2) g = do l <- findLtPrf f1 g
@@ -74,7 +85,11 @@ syntax [f] "<" [g] "," [t] = (Functor f, Functor g) =>
        {default tactics {applyTactic seeSig ; solve }  S : f :<: g} -> t
 
 inj : f < g, f a ->  g a
-inj x {S = MkSub inj'} {a = a} = inj' a x
+inj x {S = S} {a = a} = injMethod S a x
+
+prj : f < g, g a -> Maybe (f a)
+prj x {S = S} {a = a} = prjMethod S a x
+
 
 data Fix : (Type -> Type) -> Type where
   In : f (Fix f) -> Fix f
