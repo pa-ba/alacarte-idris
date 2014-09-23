@@ -12,12 +12,16 @@ infixl 8 :=:
 %default total
 
 data (:+:) : (Type -> Type) -> (Type -> Type) -> Type -> Type  where
-     Inl : f a -> (:+:) f g a
-     Inr : g a -> (:+:) f g a
+  Inl : f a -> (:+:) f g a
+  Inr : g a -> (:+:) f g a
 
+
+instance (Functor f, Functor g) => Functor (f :+: g) where
+  map f (Inl x) = Inl (map f x)
+  map f (Inr x) = Inr (map f x)
 
 record (:<:) : (Type -> Type) -> (Type -> Type) -> Type where
-  MkSub : (inj : (a: Type) -> f a -> g a) -> f :<: g
+  MkSub : (injMethod : (a: Type) -> f a -> g a) -> f :<: g
 
 here : f :<: f
 here = MkSub (\ _ => id)
@@ -64,8 +68,28 @@ seeSig ctxt `(~x :<: ~y) = case findInCtxt x y ctxt of
                Nothing   => Fail [TextPart "not found prf"]
 seeSig ctxt g = Fail [TextPart "not the right goal", TermPart g]
 
-inj : {default tactics {applyTactic seeSig ; solve }  S : f :<: g} -> f a -> g a
-inj {S = MkSub inj'} {a = a} = inj' a
+
+
+syntax [f] "<" [g] "," [t] = (Functor f, Functor g) => 
+       {default tactics {applyTactic seeSig ; solve }  S : f :<: g} -> t
+
+inj : f < g, f a ->  g a
+inj x {S = MkSub inj'} {a = a} = inj' a x
+
+data Fix : (Type -> Type) -> Type where
+  In : f (Fix f) -> Fix f
+  
+
+%default partial
+
+fold : Functor f => (f a -> a) -> Fix f -> a
+fold f (In x) = f (map (fold f) x)
+
+%default total
+    
+inject : f < g, f (Fix g) -> Fix g
+inject x = In (inj x)
+
 
 
 data F a = MkF a a
@@ -74,18 +98,20 @@ data H a = MkH a
 
 data G a = MkG a
 
-data Fix : (Type -> Type) -> Type where
-  In : f (Fix f) -> Fix f
-  
-inject : {default tactics {applyTactic seeSig ; solve }  S : f :<: g} -> f (Fix g) -> Fix g
-inject {f=f} {g=g} = In . inj {f=f} {g = g}
+instance Functor F where  
+    map f (MkF x y) = MkF (f x) (f y)
+
+instance Functor H where  
+    map f (MkH x) = MkH (f x)
+
+
 
 -- smart constructor for F
-iF : {default tactics {applyTactic seeSig ; solve }  S : F :<: g} -> Fix g -> Fix g -> Fix g
-iF {S=S} x y = inject {S = S} (MkF x y)
+iF : F < g, Fix g -> Fix g -> Fix g
+iF x y = inject {f=F} (MkF x y)
 
 test : F a -> (F :+: H) a
-test x = inj {f=F} {g = F:+:H } x
+test = inj
 
 tacticTest1 : F :<: F
 tacticTest1 = proof applyTactic seeSig
