@@ -62,6 +62,18 @@ findSub f g = if f == g then Just `(here {f=~f})
                                  return `(split {f1=~f1} {g=~g} {f2=~f2} ~l ~r)
         next _ = Nothing
 
+sigList : TT -> List TT
+sigList `(~f :+: ~g) = sigList f ++ sigList g
+sigList f = [f]
+
+
+hasDupl' : List TT -> Maybe TT
+hasDupl' [] = Nothing
+hasDupl'  (x::xs) = if elem x xs then Just x else hasDupl' xs
+
+hasDupl : TT -> Maybe TT
+hasDupl = hasDupl' . sigList
+
 isGoal : TT -> TT -> TT -> Bool
 isGoal f g `(~f' :<: ~g') = f' == f && g' == g
 isGoal _ _ _ = False
@@ -75,13 +87,17 @@ findInCtxt f g [] = Nothing
 
 
 tacticSub : List (TTName, Binder TT) -> TT -> Tactic
-tacticSub ctxt `(~x :<: ~y) = case findInCtxt x y ctxt of
-       Just prf => Exact prf
-       Nothing => case findSub x y of
-               Just prf  => Exact prf
-               Nothing   => Fail [TextPart "not found prf"]
-tacticSub ctxt g = Fail [TextPart "not the right goal", TermPart g]
-
+tacticSub ctxt `(~x :<: ~y) = 
+          case hasDupl x of
+            Just x' => Fail [TermPart x', TextPart "occurs twice in", TermPart x]
+            _ => case hasDupl y of
+                   Just y' => Fail [TermPart y', TextPart "occurs twice in", TermPart y]
+                   _ => case findInCtxt x y ctxt of
+                           Just prf => Exact prf
+                           Nothing => case findSub x y of
+                                        Just prf  => Exact prf
+                                        Nothing   => Fail [TextPart "Cannot derive", TermPart `(~x :<: ~y)]
+tacticSub ctxt g = Fail [TermPart g, TextPart "is not a goal of the form f :<: g"]
 
 
 syntax [f] "<" [g] "," [t] = (Functor f, Functor g) => 
