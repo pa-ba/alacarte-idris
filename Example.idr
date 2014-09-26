@@ -26,20 +26,24 @@ iF x y = inject {f=F} (MkF x y)
 
 
 
-test : F a -> (F :+: H) a
-test = inj
+test1 : F a -> (F :+: H) a
+test1 = inj
 
-tacticTest1 : g < h, g a -> (F :+: h) a
-tacticTest1 = inj {f=g} {g=F :+: h}
-
-
-tacticTest2 : F a -> (F :+: H) a
-tacticTest2 = inj
+test2 : Functor g => g a -> g a
+test2 = inj
 
 
-tacticTest3 : (F :+: H) a -> (H :+: F) a
-tacticTest3 = inj
+test3 : g < h, (F :+: g) a -> (F :+: h) a
+test3 = inj
 
-tacticTest4 : (F :+: H) a -> (H :+: G :+: F) a
-tacticTest4 = inj
+
+test4 : F a -> (F :+: H) a
+test4 = inj
+
+
+test5 : (F :+: H) a -> (H :+: F) a
+test5 = inj
+
+test6 : (F :+: H) a -> (H :+: G :+: F) a
+test6 = inj
 
