@@ -21,7 +21,7 @@ instance Functor G where
 
 
 -- smart constructor for F
-iF : F < g, Fix g -> Fix g -> Fix g
+iF : F :<: g, Fix g -> Fix g -> Fix g
 iF x y = inject (MkF x y)
 
 
@@ -33,10 +33,10 @@ test2 : Functor g => g a -> g a
 test2 = inj
 
 
-test3 : g < h, (F :+: g) a -> (F :+: h) a
+test3 : g :<: h, (F :+: g) a -> (F :+: h) a
 test3 = inj
 
-test7 : g < g', h < h', (h :+: g) a -> (g' :+: h') a
+test7 : g :<: g', h :<: h', (h :+: g) a -> (g' :+: h') a
 test7 = inj
 
 
