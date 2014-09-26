@@ -54,7 +54,7 @@ split (MkSub inj1 prj1) (MkSub inj2 prj2) = MkSub inj prj
 
 -- weaker equality on TT
 eqTT : TT -> TT -> Bool
-eqTT (P Bound n1 _) (P Bound n2 _) = n1 == n2
+eqTT (P _ n1 _) (P _ n2 _) = n1 == n2
 eqTT x y = x == y
 
 findInCtxt : TT -> TT -> List (TTName, TT, TT) -> Maybe TT
