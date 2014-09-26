@@ -51,15 +51,21 @@ split (MkSub inj1 prj1) (MkSub inj2 prj2) = MkSub inj prj
             prj a x = map Inl (prj1 a x) <|> map Inr (prj2 a x)
 
 
+
+-- weaker equality on TT
+eqTT : TT -> TT -> Bool
+eqTT (P Bound n1 _) (P Bound n2 _) = n1 == n2
+eqTT x y = x == y
+
 findInCtxt : TT -> TT -> List (TTName, TT, TT) -> Maybe TT
-findInCtxt f g ((n,f',g') :: r) = if f == f' && g == g' 
+findInCtxt f g ((n,f',g') :: r) = if eqTT f f' && eqTT g g' 
                                   then Just (P Bound n `(~f :<: ~g))
                                   else findInCtxt f g r
 findInCtxt f g [] = Nothing
 
 
 findSub : TT -> TT -> List (TTName, TT, TT) -> Either TT TT
-findSub f g ctxt = if f == g then Right `(here {f=~f}) 
+findSub f g ctxt = if eqTT f g then Right `(here {f=~f}) 
                    else case findInCtxt f g ctxt of
                      Just t => Right t
                      Nothing => case g of
