@@ -123,6 +123,11 @@ tacticSub ctxt g = Fail [TermPart g, TextPart "is not a goal of the form f :<: g
 syntax [f] ":<:" [g] "," [t] = (Functor f, Functor g) => 
        {default tactics {applyTactic tacticSub ; solve }  S : f :<: g} -> t
 
+syntax [f] ":=:" [g] "," [t] = (Functor f, Functor g) => 
+       {default tactics {applyTactic tacticSub ; solve }  S : f :<: g} ->
+       {default tactics {applyTactic tacticSub ; solve }  S' : g :<: f} -> t
+
+
 %error_handler
 subErr : ErrorHandler
 subErr (CantSolveGoal g ctxt) = case g of
@@ -132,10 +137,10 @@ subErr (CantSolveGoal g ctxt) = case g of
        _ => Nothing
 subErr _ = Nothing
 
-inj : f :<: g, f a ->  g a
+inj : src :<: tgt, src a ->  tgt a
 inj x {S = S} {a = a} = injMethod S a x
 
-prj : f :<: g, g a -> Maybe (f a)
+prj : tgt :<: src, src a -> Maybe (tgt a)
 prj x {S = S} {a = a} = prjMethod S a x
 
 
@@ -153,3 +158,7 @@ fold f (In x) = f (map (fold f) x)
 inject : f :<: g, f (Fix g) -> Fix g
 inject x = In (inj x)
 
+match : src :=: tgt1 :+: tgt2, src a -> (tgt1 a -> r) -> (tgt2 a -> r) -> r
+match {tgt1} {tgt2} x l r = case inj {tgt=tgt1:+:tgt2} x of
+                              Inl y => l y
+                              Inr y => r y
