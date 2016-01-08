@@ -22,10 +22,10 @@ instance (Functor f, Functor g) => Functor (f :+: g) where
   map f (Inl x) = Inl (map f x)
   map f (Inr x) = Inr (map f x)
 
-record (:<:) : (Type -> Type) -> (Type -> Type) -> Type where
-  MkSub : (injMethod : (a: Type) -> f a -> g a) ->
-          (prjMethod : (a: Type) -> g a -> Maybe (f a)) ->
-          f :<: g
+record (:<:) (f : Type -> Type) (g : Type -> Type) where
+  constructor MkSub 
+  injMethod : (a : Type) -> f a -> g a
+  prjMethod : (a : Type) -> g a -> Maybe (f a)
 
 here : f :<: f
 here = MkSub (\ _ => id) (\ _ => Just)
